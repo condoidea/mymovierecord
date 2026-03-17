@@ -561,7 +561,7 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 
 /* ── STATE ───────────────────────────────────── */
 let view     = 'journal';
-let listMode = 'list';   // 'list' | 'grid'
+let listMode = cfg.val('listMode') || 'list';   // 'list' | 'grid'
 let query    = '';
 let editId   = null;
 let rankYear = String(new Date().getFullYear());
@@ -1067,6 +1067,7 @@ document.getElementById('searchInput').addEventListener('input', e => {
 /* View toggle */
 document.getElementById('viewToggle').addEventListener('click', () => {
   listMode = listMode === 'list' ? 'grid' : 'list';
+  cfg.set('listMode', listMode);
   syncViewIcon();
   render();
 });
