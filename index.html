@@ -698,7 +698,15 @@ function renderGrid(el, movies) {
 function renderRanking(el, filtered, allMovies) {
   const years  = [...new Set(allMovies.map(m=>yearOf(m.date)).filter(y=>y!=='不明'))].sort().reverse();
   const scope  = rankYear === 'all' ? filtered : filtered.filter(m=>yearOf(m.date)===rankYear);
-  const ranked = [...scope].filter(m=>m.score>0).sort((a,b)=>b.score-a.score);
+  // Deduplicate: keep only the highest-scored entry per title
+  const rankedAll = [...scope].filter(m=>m.score>0).sort((a,b)=>b.score-a.score);
+  const seenTitles = new Set();
+  const ranked = rankedAll.filter(m => {
+    const key = (m.title||'').trim().toLowerCase();
+    if (seenTitles.has(key)) return false;
+    seenTitles.add(key);
+    return true;
+  });
   const unsco  = scope.filter(m=>!m.score||m.score<=0).length;
   const avg    = ranked.length ? (ranked.reduce((s,m)=>s+m.score,0)/ranked.length).toFixed(1) : null;
 
