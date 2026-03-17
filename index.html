@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0c0b10">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -65,6 +65,13 @@
         radial-gradient(ellipse at 25% 0%,  rgba(110,65,15,.18) 0%, transparent 55%),
         radial-gradient(ellipse at 75% 100%, rgba(25,15,80,.22)  0%, transparent 55%);
     }
+
+    /* iOS: prevent auto-zoom on input focus (requires font-size >= 16px) */
+    @supports (-webkit-touch-callout: none) {
+      input, textarea, select { font-size: 16px !important; }
+    }
+    /* prevent any pinch-zoom */
+    html { touch-action: manipulation; }
 
     /* ── LAYOUT ───────────────────────────────── */
     #app { position:relative; z-index:1; max-width:640px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
