@@ -515,8 +515,8 @@
       <label class="flbl">スコア &nbsp;<span id="scoreDisp" style="color:var(--gold)">未設定</span></label>
       <div class="score-row">
         <span class="score-lim">1</span>
-        <input type="range" id="fScore" min="0" max="10" step="0.5" value="0" style="--pct:0%">
-        <span class="score-lim">10</span>
+        <input type="range" id="fScore" min="0" max="100" step="1" value="0" style="--pct:0%">
+        <span class="score-lim">100</span>
       </div>
     </div>
     <div class="fg">
@@ -710,8 +710,17 @@ function renderRanking(el, filtered, allMovies) {
   const unsco  = scope.filter(m=>!m.score||m.score<=0).length;
   const avg    = ranked.length ? (ranked.reduce((s,m)=>s+m.score,0)/ranked.length).toFixed(1) : null;
 
-  const badge = i => ['🥇','🥈','🥉'][i] ?? `#${i+1}`;
-  const rcls  = i => ['r1','r2','r3'][i] ?? 'rN';
+  // Assign ranks with ties (same score = same rank, then skip)
+  const ranks = [];
+  for (let i = 0; i < ranked.length; i++) {
+    if (i > 0 && ranked[i].score === ranked[i-1].score) {
+      ranks.push(ranks[i-1]);
+    } else {
+      ranks.push(i + 1);
+    }
+  }
+  const badge = rank => rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+  const rcls  = rank => rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : 'rN';
 
   const yearOpts = [
     `<option value="all" ${rankYear==='all'?'selected':''}>全期間</option>`,
@@ -734,8 +743,8 @@ function renderRanking(el, filtered, allMovies) {
           ? `<img data-src="${esc(p)}" alt="">`
           : `<div class="rank-poster-ph">🎬</div>`;
         return `
-          <div class="rank-item ${rcls(i)}" data-id="${m.id}" style="animation-delay:${i*30}ms">
-            <div class="rank-num">${badge(i)}</div>
+          <div class="rank-item ${rcls(ranks[i])}" data-id="${m.id}" style="animation-delay:${i*30}ms">
+            <div class="rank-num">${badge(ranks[i])}</div>
             <div class="rank-poster">${thumb}</div>
             <div class="rank-info">
               <div class="rank-title">${esc(m.title)}</div>
@@ -1003,7 +1012,7 @@ function openEdit(id) {
 function setScore(v) {
   const s = document.getElementById('fScore');
   s.value = v;
-  s.style.setProperty('--pct', v === 0 ? '0%' : (v/10*100)+'%');
+  s.style.setProperty('--pct', v === 0 ? '0%' : v+'%');
   document.getElementById('scoreDisp').textContent = v === 0 ? '未設定' : v;
 }
 
@@ -1016,7 +1025,7 @@ function saveRecord() {
   const title         = titleWrapHid ? selectedTitle : manualTitle;
 
   const date       = document.getElementById('fDate').value;
-  const score      = parseFloat(document.getElementById('fScore').value) || 0;
+  const score      = parseInt(document.getElementById('fScore').value) || 0;
   const notes      = document.getElementById('fNotes').value.trim();
   const tmdbId     = document.getElementById('fTmdbId').value     || null;
   const posterPath = document.getElementById('fPosterPath').value || null;
@@ -1101,8 +1110,8 @@ document.getElementById('viewToggle').addEventListener('click', () => {
 
 /* Score slider */
 document.getElementById('fScore').addEventListener('input', e => {
-  const v = parseFloat(e.target.value);
-  e.target.style.setProperty('--pct', v === 0 ? '0%' : (v/10*100)+'%');
+  const v = parseInt(e.target.value);
+  e.target.style.setProperty('--pct', v === 0 ? '0%' : v+'%');
   document.getElementById('scoreDisp').textContent = v === 0 ? '未設定' : v;
 });
 
@@ -1168,6 +1177,20 @@ document.getElementById('importFile').addEventListener('change', e => {
 /* ── SERVICE WORKER ──────────────────────────── */
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+/* ── MIGRATE SCORES (0-10 → 0-100, one-time) ── */
+if (cfg.val('scoreScale') !== 100) {
+  const all = db.all();
+  let changed = false;
+  all.forEach(m => {
+    if (m.score > 0 && m.score <= 10) {
+      m.score = Math.round(m.score * 10);
+      changed = true;
+    }
+  });
+  if (changed) db.save(all);
+  cfg.set('scoreScale', 100);
 }
 
 /* ── INIT ────────────────────────────────────── */
