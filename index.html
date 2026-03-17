@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0b10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="映画記録">
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lora:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <title>映画記録</title>
+  <style>
+    /* ── TOKENS ───────────────────────────────── */
+    :root {
+      --bg:       #0c0b10;
+      --surface:  #111018;
+      --card:     #1a1825;
+      --card-h:   #22202e;
+      --border:   rgba(212,168,83,.13);
+      --border-h: rgba(212,168,83,.4);
+      --gold:     #d4a853;
+      --gold-d:   rgba(212,168,83,.45);
+      --gold-dim: rgba(212,168,83,.07);
+      --cream:    #f2e8d5;
+      --cream-d:  rgba(242,232,213,.55);
+      --cream-m:  rgba(242,232,213,.3);
+      --danger:   #c04040;
+      --green:    #5aad6e;
+      --st: env(safe-area-inset-top,0px);
+      --sb: env(safe-area-inset-bottom,0px);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html { -webkit-text-size-adjust: 100%; height: -webkit-fill-available; }
+    body {
+      background: var(--bg); color: var(--cream);
+      font-family: 'Lora','Noto Serif JP',serif;
+      min-height: 100vh; min-height: -webkit-fill-available;
+      overflow-x: hidden; -webkit-font-smoothing: antialiased;
+    }
+
+    /* film grain */
+    body::before {
+      content: ''; position: fixed; inset: -50%; width: 200%; height: 200%;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 220px 220px; opacity: .032; pointer-events: none; z-index: 9999;
+      animation: grain .9s steps(1) infinite;
+    }
+    @keyframes grain {
+      0%  { transform:translate(0,0) }   20% { transform:translate(-3%,-2%) }
+      40% { transform:translate(2%,-4%) } 60% { transform:translate(-1%,3%) }
+      80% { transform:translate(3%,1%) }
+    }
+
+    /* atmosphere */
+    body::after {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(ellipse at 25% 0%,  rgba(110,65,15,.18) 0%, transparent 55%),
+        radial-gradient(ellipse at 75% 100%, rgba(25,15,80,.22)  0%, transparent 55%);
+    }
+
+    /* ── LAYOUT ───────────────────────────────── */
+    #app { position:relative; z-index:1; max-width:640px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
+
+    /* ── HEADER ───────────────────────────────── */
+    #header {
+      position: sticky; top: 0; z-index: 100;
+      padding: calc(var(--st) + 14px) 20px 0;
+      background: linear-gradient(to bottom, var(--bg) 65%, transparent);
+    }
+    .hdr-row { display:flex; align-items:flex-end; justify-content:space-between; padding-bottom:2px; }
+    .app-title {
+      font-family: 'Playfair Display',serif;
+      font-size: clamp(1.35rem,4vw,1.6rem); font-weight:700;
+      color: var(--gold); letter-spacing:.02em;
+    }
+    .app-sub {
+      font-family: 'DM Mono',monospace; font-size:.63rem;
+      letter-spacing:.18em; text-transform:uppercase; color:var(--cream-m); margin-top:1px;
+    }
+    .hdr-btns { display:flex; gap:6px; align-items:center; }
+    .hdr-btn {
+      background:none; border:1px solid var(--border); border-radius:8px;
+      color:var(--cream-d); cursor:pointer; padding:7px 9px;
+      transition:border-color .2s, color .2s; line-height:1;
+    }
+    .hdr-btn.on  { border-color:var(--gold-d); color:var(--gold); }
+    .hdr-btn:active { transform:scale(.92); }
+
+    /* ── SEARCH BAR ───────────────────────────── */
+    #searchWrap { max-height:0; overflow:hidden; opacity:0; transition:max-height .3s ease, opacity .3s; }
+    #searchWrap.open { max-height:60px; opacity:1; padding-top:10px; }
+    #searchInput {
+      width:100%; background:var(--card); border:1px solid var(--border);
+      border-radius:10px; color:var(--cream); font-family:'Lora',serif; font-size:.9rem;
+      padding:10px 14px; outline:none; appearance:none; transition:border-color .2s;
+    }
+    #searchInput::placeholder { color:var(--cream-m); }
+    #searchInput:focus { border-color:var(--gold-d); }
+
+    /* ── TABS ─────────────────────────────────── */
+    #tabs { display:flex; gap:4px; padding:14px 0 0; }
+    .tab {
+      background:none; border:none; border-bottom:2px solid transparent;
+      color:var(--cream-m); cursor:pointer; font-family:'DM Mono',monospace;
+      font-size:.72rem; letter-spacing:.1em; text-transform:uppercase;
+      padding:5px 12px 8px; transition:color .2s, border-color .2s;
+    }
+    .tab.on { color:var(--gold); border-bottom-color:var(--gold); }
+
+    /* ── MAIN ─────────────────────────────────── */
+    #main { flex:1; padding:16px 20px calc(80px + var(--sb)); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+
+    /* ── MONTH GROUPS ─────────────────────────── */
+    .mgroup { margin-bottom:24px; }
+    .mhdr {
+      font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.2em; text-transform:uppercase;
+      color:var(--gold-d); margin-bottom:8px; padding-bottom:8px;
+      border-bottom:1px solid var(--border);
+    }
+
+    /* ── LIST VIEW ────────────────────────────── */
+    .lv-item {
+      display:flex; align-items:center; gap:12px; padding:10px 0;
+      border-bottom:1px solid rgba(255,255,255,.04);
+      cursor:pointer; transition:opacity .15s; animation:fadeUp .3s ease both;
+    }
+    .lv-item:active { opacity:.65; }
+    .lv-item:last-child { border-bottom:none; }
+
+    .lv-thumb {
+      width:38px; height:56px; border-radius:4px;
+      background:var(--card); overflow:hidden; flex-shrink:0;
+      border:1px solid var(--border);
+    }
+    .lv-thumb img { width:100%; height:100%; object-fit:cover; display:block; opacity:0; transition:opacity .3s; }
+    .lv-thumb img.loaded { opacity:1; }
+    .lv-thumb-ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:.9rem; opacity:.3; }
+
+    .lv-info { flex:1; min-width:0; }
+    .lv-title {
+      font-family:'Playfair Display',serif; font-size:.93rem;
+      font-weight:600; line-height:1.3;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .lv-date { font-family:'DM Mono',monospace; font-size:.6rem; color:var(--cream-m); margin-top:3px; }
+    .lv-note { font-size:.72rem; color:var(--cream-d); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    .lv-score {
+      font-family:'DM Mono',monospace; font-size:.78rem;
+      color:var(--gold); border:1px solid var(--gold-d);
+      border-radius:5px; padding:2px 7px; white-space:nowrap; flex-shrink:0;
+    }
+    .lv-score.none { color:var(--cream-m); border-color:var(--border); }
+
+    /* ── GRID VIEW ────────────────────────────── */
+    .gv-wrap { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+
+    .gv-card {
+      position:relative; border-radius:8px; overflow:hidden;
+      cursor:pointer; aspect-ratio:2/3; background:var(--card);
+      border:1px solid var(--border);
+      transition:transform .18s, border-color .18s;
+      animation:fadeUp .3s ease both;
+    }
+    .gv-card:active { transform:scale(.95); }
+
+    .gv-img { width:100%; height:100%; object-fit:cover; display:block; opacity:0; transition:opacity .3s; position:absolute; inset:0; }
+    .gv-img.loaded { opacity:1; }
+    .gv-ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:1.8rem; opacity:.2; }
+
+    .gv-overlay {
+      position:absolute; bottom:0; left:0; right:0;
+      background:linear-gradient(to top, rgba(0,0,0,.9) 0%, transparent 100%);
+      padding:22px 8px 8px;
+    }
+    .gv-title {
+      font-family:'Playfair Display',serif; font-size:.72rem; font-weight:700;
+      line-height:1.3; color:#fff;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    }
+    .gv-score { font-family:'DM Mono',monospace; font-size:.62rem; color:var(--gold); margin-top:3px; }
+
+    /* ── RANKING VIEW ─────────────────────────── */
+    .rank-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+    .rank-label { font-family:'Playfair Display',serif; font-size:1rem; color:var(--gold); }
+    #yearSel {
+      background:var(--card); border:1px solid var(--border); border-radius:8px;
+      color:var(--cream); font-family:'DM Mono',monospace; font-size:.72rem;
+      padding:6px 10px; outline:none; cursor:pointer;
+    }
+    .rank-stats { font-family:'DM Mono',monospace; font-size:.65rem; color:var(--cream-m); margin-bottom:16px; letter-spacing:.05em; }
+    .rank-item {
+      background:var(--card); border:1px solid var(--border); border-radius:12px;
+      padding:13px 16px; margin-bottom:7px;
+      cursor:pointer; display:flex; align-items:center; gap:12px;
+      transition:background .18s, border-color .18s; animation:fadeUp .3s ease both;
+    }
+    .rank-item:hover  { background:var(--card-h); border-color:var(--border-h); }
+    .rank-item:active { opacity:.75; }
+    .rank-item.r1 { border-color:rgba(212,168,83,.45); background:linear-gradient(135deg, var(--card) 0%, rgba(212,168,83,.06) 100%); }
+    .rank-item.r2 { border-color:rgba(176,190,200,.3); }
+    .rank-item.r3 { border-color:rgba(170,120,80,.3); }
+
+    .rank-num { font-family:'Playfair Display',serif; font-size:1.05rem; font-weight:700; width:30px; text-align:center; flex-shrink:0; }
+    .r1 .rank-num { color:#d4a853; } .r2 .rank-num { color:#b0bec5; } .r3 .rank-num { color:#a0785a; }
+    .rN .rank-num { color:var(--cream-m); font-size:.78rem; font-family:'DM Mono',monospace; }
+
+    .rank-poster { width:34px; height:50px; border-radius:3px; background:var(--card-h); overflow:hidden; flex-shrink:0; }
+    .rank-poster img { width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .3s; }
+    .rank-poster img.loaded { opacity:1; }
+    .rank-poster-ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:.8rem; opacity:.3; }
+
+    .rank-info { flex:1; min-width:0; }
+    .rank-title { font-family:'Playfair Display',serif; font-size:.93rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .rank-date  { font-family:'DM Mono',monospace; font-size:.62rem; color:var(--cream-m); margin-top:3px; }
+    .rank-score { font-family:'DM Mono',monospace; font-size:1rem; color:var(--gold); flex-shrink:0; }
+
+    /* ── SETTINGS VIEW ────────────────────────── */
+    .set-section { margin-bottom:28px; }
+    .set-ttl {
+      font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.2em;
+      text-transform:uppercase; color:var(--gold-d); margin-bottom:12px;
+      padding-bottom:8px; border-bottom:1px solid var(--border);
+    }
+    .set-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:8px; }
+    .set-card-ttl { font-family:'Playfair Display',serif; font-size:.92rem; margin-bottom:5px; }
+    .set-card-desc { font-size:.75rem; color:var(--cream-d); line-height:1.65; margin-bottom:12px; }
+    .set-card-desc a { color:var(--gold); text-decoration:none; }
+
+    .api-row { display:flex; gap:8px; }
+    .api-row .finput { flex:1; font-family:'DM Mono',monospace; font-size:.8rem; }
+    .btn-sm {
+      background:var(--card-h); border:1px solid var(--border); border-radius:8px;
+      color:var(--cream-d); font-family:'DM Mono',monospace; font-size:.72rem;
+      padding:0 14px; cursor:pointer; white-space:nowrap;
+      transition:color .2s, border-color .2s; height:42px;
+    }
+    .btn-sm.gold { color:var(--gold); border-color:var(--gold-d); }
+    .btn-sm:active { opacity:.7; }
+
+    .api-status { font-family:'DM Mono',monospace; font-size:.63rem; margin-top:7px; display:flex; align-items:center; gap:6px; }
+    .api-dot { width:6px; height:6px; border-radius:50%; background:var(--cream-m); flex-shrink:0; }
+    .api-dot.ok  { background:var(--green); }
+    .api-dot.err { background:var(--danger); }
+
+    .btn-export, .btn-import {
+      width:100%; background:var(--card-h); border:1px solid var(--border);
+      border-radius:10px; color:var(--cream-d); font-family:'DM Mono',monospace;
+      font-size:.75rem; letter-spacing:.05em; padding:13px; cursor:pointer;
+      transition:color .2s, border-color .2s;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    .btn-export:hover, .btn-import:hover { color:var(--gold); border-color:var(--gold-d); }
+    .btn-import { margin-top:8px; }
+    .btn-export:active, .btn-import:active { opacity:.7; }
+
+    .set-stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .set-stat { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px; text-align:center; }
+    .set-stat-v { font-family:'Playfair Display',serif; font-size:1.5rem; color:var(--gold); display:block; }
+    .set-stat-l { font-family:'DM Mono',monospace; font-size:.6rem; color:var(--cream-m); margin-top:2px; display:block; }
+
+    /* ── EMPTY STATE ──────────────────────────── */
+    .empty { text-align:center; padding:50px 20px; }
+    .empty-icon { font-size:2.4rem; opacity:.4; margin-bottom:14px; }
+    .empty-title { font-family:'Playfair Display',serif; font-size:1.05rem; color:var(--cream-d); margin-bottom:8px; }
+    .empty-sub { font-size:.78rem; color:var(--cream-m); line-height:1.7; white-space:pre-line; }
+
+    /* ── FAB ──────────────────────────────────── */
+    #fab {
+      position:fixed; bottom:calc(22px + var(--sb)); right:22px;
+      width:56px; height:56px; border-radius:50%;
+      background:var(--gold); border:none; color:#0c0b10;
+      cursor:pointer; z-index:200;
+      box-shadow:0 4px 22px rgba(212,168,83,.42);
+      display:flex; align-items:center; justify-content:center;
+      transition:transform .18s, box-shadow .18s;
+    }
+    #fab:hover  { transform:scale(1.06); box-shadow:0 6px 30px rgba(212,168,83,.52); }
+    #fab:active { transform:scale(.94); }
+    #fab.hidden { display:none; }
+
+    /* ── OVERLAY ──────────────────────────────── */
+    #overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.68); z-index:300;
+      opacity:0; pointer-events:none; transition:opacity .3s;
+      backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    }
+    #overlay.on { opacity:1; pointer-events:all; }
+
+    /* ── BOTTOM SHEET ─────────────────────────── */
+    #sheet {
+      position:fixed; bottom:0; left:0; right:0; max-width:640px; margin:0 auto;
+      background:var(--surface); border:1px solid var(--border); border-bottom:none;
+      border-radius:20px 20px 0 0;
+      padding:12px 24px calc(20px + var(--sb));
+      z-index:400; max-height:92vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+      transform:translateY(100%); transition:transform .35s cubic-bezier(.32,.72,0,1);
+    }
+    #sheet.on { transform:translateY(0); }
+    .sheet-grip { width:36px; height:4px; background:var(--cream-m); border-radius:2px; margin:0 auto 20px; }
+    .sheet-ttl  { font-family:'Playfair Display',serif; font-size:1.15rem; color:var(--gold); margin-bottom:20px; }
+
+    /* ── FORM ─────────────────────────────────── */
+    .fg   { margin-bottom:18px; }
+    .flbl { display:block; font-family:'DM Mono',monospace; font-size:.68rem; letter-spacing:.12em; text-transform:uppercase; color:var(--cream-m); margin-bottom:6px; }
+    .finput, .ftxt {
+      width:100%; background:var(--card); border:1px solid var(--border);
+      border-radius:10px; color:var(--cream); font-family:'Lora',serif; font-size:.95rem;
+      padding:10px 14px; outline:none; appearance:none; transition:border-color .2s;
+    }
+    .finput[type="date"] { color-scheme:dark; }
+    .finput:focus, .ftxt:focus { border-color:var(--gold-d); }
+    .ftxt { resize:vertical; min-height:96px; line-height:1.65; }
+
+    /* ── TMDB AUTOCOMPLETE ────────────────────── */
+    .tmdb-wrap { position:relative; }
+    .tmdb-drop {
+      position:absolute; top:calc(100% + 4px); left:0; right:0;
+      background:var(--surface); border:1px solid var(--border-h); border-radius:10px;
+      z-index:50; max-height:280px; overflow-y:auto;
+      box-shadow:0 8px 32px rgba(0,0,0,.55); display:none;
+    }
+    .tmdb-drop.show { display:block; }
+    .tmdb-item {
+      display:flex; align-items:center; gap:10px; padding:10px 14px;
+      cursor:pointer; border-bottom:1px solid rgba(255,255,255,.04);
+      transition:background .15s;
+    }
+    .tmdb-item:last-child { border-bottom:none; }
+    .tmdb-item:hover, .tmdb-item:active { background:var(--card-h); }
+    .tmdb-thumb { width:32px; height:48px; border-radius:3px; background:var(--card); overflow:hidden; flex-shrink:0; border:1px solid var(--border); }
+    .tmdb-thumb img { width:100%; height:100%; object-fit:cover; }
+    .tmdb-thumb-ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:.7rem; opacity:.3; }
+    .tmdb-item-title { font-family:'Playfair Display',serif; font-size:.85rem; line-height:1.3; flex:1; }
+    .tmdb-item-year  { font-family:'DM Mono',monospace; font-size:.62rem; color:var(--cream-m); margin-top:2px; }
+    .tmdb-msg        { padding:14px; text-align:center; font-family:'DM Mono',monospace; font-size:.72rem; color:var(--cream-m); }
+
+    /* ── SELECTED MOVIE PREVIEW ───────────────── */
+    .movie-sel {
+      display:flex; align-items:center; gap:12px;
+      background:var(--gold-dim); border:1px solid var(--border-h);
+      border-radius:10px; padding:12px; margin-bottom:0;
+    }
+    .sel-thumb { width:44px; height:64px; border-radius:4px; background:var(--card); overflow:hidden; flex-shrink:0; border:1px solid var(--border); }
+    .sel-thumb img { width:100%; height:100%; object-fit:cover; }
+    .sel-thumb-ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:1rem; opacity:.35; }
+    .sel-info { flex:1; min-width:0; }
+    .sel-title  { font-family:'Playfair Display',serif; font-size:.9rem; font-style:italic; line-height:1.3; }
+    .sel-meta   { font-family:'DM Mono',monospace; font-size:.62rem; color:var(--cream-m); margin-top:3px; }
+    .sel-change { font-family:'DM Mono',monospace; font-size:.62rem; color:var(--gold); cursor:pointer; margin-top:5px; display:inline-block; }
+
+    /* ── SCORE SLIDER ─────────────────────────── */
+    .score-row { display:flex; align-items:center; gap:10px; }
+    .score-num { font-family:'DM Mono',monospace; font-size:1.3rem; color:var(--gold); min-width:52px; text-align:center; }
+    .score-lim { font-family:'DM Mono',monospace; font-size:.63rem; color:var(--cream-m); }
+    input[type="range"] {
+      flex:1; -webkit-appearance:none; appearance:none;
+      height:4px; border-radius:2px; outline:none; cursor:pointer;
+      background:linear-gradient(to right, var(--gold) var(--pct,0%), rgba(255,255,255,.1) var(--pct,0%));
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance:none; width:22px; height:22px;
+      border-radius:50%; background:var(--gold); cursor:pointer;
+      box-shadow:0 2px 10px rgba(212,168,83,.45);
+    }
+
+    /* ── BUTTONS ──────────────────────────────── */
+    .btn-save {
+      width:100%; background:var(--gold); border:none; border-radius:10px; color:#0c0b10;
+      font-family:'DM Mono',monospace; font-size:.82rem; font-weight:500;
+      letter-spacing:.1em; padding:14px; cursor:pointer; margin-bottom:10px;
+      transition:opacity .2s, transform .15s;
+    }
+    .btn-save:hover   { opacity:.88; }
+    .btn-save:active  { transform:scale(.97); }
+    .btn-del {
+      width:100%; background:transparent; border:1px solid var(--danger);
+      border-radius:10px; color:var(--danger); font-family:'DM Mono',monospace;
+      font-size:.78rem; letter-spacing:.1em; padding:12px; cursor:pointer;
+      transition:background .2s;
+    }
+    .btn-del:hover { background:rgba(192,64,64,.1); }
+
+    /* ── TOAST ────────────────────────────────── */
+    #toast {
+      position:fixed; bottom:calc(36px + var(--sb)); left:50%;
+      transform:translateX(-50%) translateY(20px);
+      background:var(--card); border:1px solid var(--border-h);
+      border-radius:24px; padding:9px 20px;
+      font-family:'DM Mono',monospace; font-size:.75rem; color:var(--cream-d);
+      z-index:1000; opacity:0; pointer-events:none;
+      transition:opacity .3s, transform .3s; white-space:nowrap;
+    }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    /* ── ANIM ─────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(8px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <header id="header">
+    <div class="hdr-row">
+      <div>
+        <div class="app-title">映画記録</div>
+        <div class="app-sub">Cinema Journal</div>
+      </div>
+      <div class="hdr-btns">
+        <button class="hdr-btn" id="viewToggle" title="表示切替" style="visibility:hidden">
+          <span id="viewIcon"></span>
+        </button>
+        <button class="hdr-btn" id="searchBtn" title="検索">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div id="searchWrap">
+      <input id="searchInput" type="search" placeholder="タイトルやメモで検索…">
+    </div>
+    <nav id="tabs">
+      <button class="tab on" data-v="journal">ジャーナル</button>
+      <button class="tab"    data-v="ranking">ランキング</button>
+      <button class="tab"    data-v="settings">設定</button>
+    </nav>
+  </header>
+
+  <!-- MAIN -->
+  <main id="main"></main>
+
+  <!-- FAB -->
+  <button id="fab" title="記録を追加">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  </button>
+
+</div><!-- #app -->
+
+<!-- OVERLAY -->
+<div id="overlay"></div>
+
+<!-- BOTTOM SHEET -->
+<div id="sheet">
+  <div class="sheet-grip"></div>
+  <div class="sheet-ttl" id="sheetTtl">記録を追加</div>
+
+  <form id="form" autocomplete="off" onsubmit="return false">
+    <!-- Hidden fields -->
+    <input type="hidden" id="fTmdbId">
+    <input type="hidden" id="fPosterPath">
+    <input type="hidden" id="fYear">
+
+    <!-- Title / TMDB search -->
+    <div class="fg">
+      <label class="flbl">映画タイトル</label>
+
+      <!-- Selected movie preview -->
+      <div class="movie-sel hidden" id="movieSel">
+        <div class="sel-thumb" id="selThumb"><div class="sel-thumb-ph">🎬</div></div>
+        <div class="sel-info">
+          <div class="sel-title"  id="selTitle"></div>
+          <div class="sel-meta"   id="selMeta"></div>
+          <div class="sel-change" id="selChange">変更する →</div>
+        </div>
+      </div>
+
+      <!-- Search input -->
+      <div class="tmdb-wrap" id="titleWrap">
+        <input class="finput" type="text" id="fTitle" placeholder="タイトルを入力…" autocomplete="off">
+        <div class="tmdb-drop" id="tmdbDrop"></div>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="flbl" for="fDate">視聴日</label>
+      <input class="finput" type="date" id="fDate" required>
+    </div>
+    <div class="fg">
+      <label class="flbl">スコア &nbsp;<span id="scoreDisp" style="color:var(--gold)">未設定</span></label>
+      <div class="score-row">
+        <span class="score-lim">1</span>
+        <input type="range" id="fScore" min="0" max="10" step="0.5" value="0" style="--pct:0%">
+        <span class="score-lim">10</span>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="flbl" for="fNotes">メモ・感想</label>
+      <textarea class="ftxt" id="fNotes" placeholder="印象に残ったシーン、感想など…"></textarea>
+    </div>
+
+    <button type="button" class="btn-save" id="saveBtn">保存する</button>
+    <button type="button" id="delBtn"  class="btn-del hidden">この記録を削除する</button>
+  </form>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Import file input -->
+<input type="file" id="importFile" accept=".json" style="display:none">
+
+<script>
+/* ════════════════════════════════════════════════
+   映画記録  —  Complete App v2
+   ════════════════════════════════════════════════ */
+
+/* ── CONSTANTS ──────────────────────────────── */
+const STORE_KEY = 'eigakiroku_v1';
+const CFG_KEY   = 'eigakiroku_cfg';
+const TMDB_BASE = 'https://api.themoviedb.org/3';
+const IMG_BASE  = 'https://image.tmdb.org/t/p/w185';
+const IMG_MED   = 'https://image.tmdb.org/t/p/w342';
+
+const GENRE_MAP = {
+  28:'アクション', 12:'アドベンチャー', 16:'アニメーション', 35:'コメディ',
+  80:'犯罪', 99:'ドキュメンタリー', 18:'ドラマ', 10751:'ファミリー',
+  14:'ファンタジー', 36:'歴史', 27:'ホラー', 10402:'音楽',
+  9648:'ミステリー', 10749:'ロマンス', 878:'SF', 10770:'テレビ映画',
+  53:'スリラー', 10752:'戦争', 37:'西部劇'
+};
+
+/* ── STORAGE ─────────────────────────────────── */
+const db = {
+  all()  { try { return JSON.parse(localStorage.getItem(STORE_KEY)||'{"m":[]}').m||[]; } catch { return []; } },
+  save(a){ localStorage.setItem(STORE_KEY, JSON.stringify({m:a})); },
+  add(o) { const a=db.all(); a.push({id:uid(), ts:Date.now(), ...o}); db.save(a); },
+  upd(id,p){ const a=db.all(), i=a.findIndex(x=>x.id===id); if(i>=0){Object.assign(a[i],p);db.save(a);} },
+  del(id){ db.save(db.all().filter(x=>x.id!==id)); }
+};
+const cfg = {
+  get()    { try { return JSON.parse(localStorage.getItem(CFG_KEY)||'{}'); } catch { return {}; } },
+  set(k,v) { const c=cfg.get(); c[k]=v; localStorage.setItem(CFG_KEY,JSON.stringify(c)); },
+  val(k)   { return cfg.get()[k]; }
+};
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* ── STATE ───────────────────────────────────── */
+let view     = 'journal';
+let listMode = 'list';   // 'list' | 'grid'
+let query    = '';
+let editId   = null;
+let rankYear = String(new Date().getFullYear());
+let tmdbTimer  = null;
+let tmdbCache  = [];   // last TMDB search results
+
+/* ── UTILS ───────────────────────────────────── */
+const fmtJP   = d => { if(!d) return ''; const[y,m,day]=d.split('-'); return `${y}年${+m}月${+day}日`; };
+const monthKey= d => { if(!d) return '日付不明'; const[y,m]=d.split('-'); return `${y}年${+m}月`; };
+const yearOf  = d => d ? d.slice(0,4) : '不明';
+const today   = ()=> new Date().toISOString().slice(0,10);
+const esc     = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const imgUrl  = p => p ? `${IMG_BASE}${p}` : null;
+
+/* ── LAZY IMG ────────────────────────────────── */
+function initImgs(el) {
+  el.querySelectorAll('img[data-src]').forEach(img => {
+    img.src = img.dataset.src;
+    img.onload  = () => img.classList.add('loaded');
+    img.onerror = () => { img.style.display='none'; };
+    if (img.complete && img.naturalWidth) img.classList.add('loaded');
+  });
+}
+
+/* ══════════════════════════════════════════════
+   RENDER
+   ══════════════════════════════════════════════ */
+function render() {
+  const el     = document.getElementById('main');
+  const movies = db.all();
+  const fil = query
+    ? movies.filter(x =>
+        (x.title||'').toLowerCase().includes(query.toLowerCase()) ||
+        (x.notes||'').toLowerCase().includes(query.toLowerCase()))
+    : movies;
+
+  const fab = document.getElementById('fab');
+  const vt  = document.getElementById('viewToggle');
+  fab.classList.toggle('hidden', view === 'settings');
+  vt.style.visibility = view === 'journal' ? 'visible' : 'hidden';
+
+  if      (view === 'journal')  renderJournal(el, fil);
+  else if (view === 'ranking')  renderRanking(el, fil, movies);
+  else if (view === 'settings') renderSettings(el, movies);
+}
+
+/* ── JOURNAL ─────────────────────────────────── */
+function renderJournal(el, movies) {
+  if (!movies.length) {
+    el.innerHTML = `<div class="empty">
+      <div class="empty-icon">🎬</div>
+      <div class="empty-title">${query ? '該当する記録がありません' : 'まだ記録がありません'}</div>
+      <div class="empty-sub">${query ? '別のキーワードで試してみてください'
+        : '右下の ＋ ボタンから\n観た映画を記録しましょう'}</div>
+    </div>`;
+    return;
+  }
+  listMode === 'grid' ? renderGrid(el, movies) : renderList(el, movies);
+}
+
+function renderList(el, movies) {
+  const sorted = [...movies].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const groups = {};
+  sorted.forEach(m => { const k=monthKey(m.date); (groups[k]=groups[k]||[]).push(m); });
+
+  el.innerHTML = `<div>${Object.entries(groups).map(([mo,items],gi) => `
+    <div class="mgroup">
+      <div class="mhdr">${mo}</div>
+      ${items.map((m,i) => {
+        const p = imgUrl(m.posterPath);
+        const thumb = p
+          ? `<img data-src="${esc(p)}" alt="">`
+          : `<div class="lv-thumb-ph">🎬</div>`;
+        const score = m.score > 0
+          ? `<span class="lv-score">${m.score}</span>`
+          : `<span class="lv-score none">—</span>`;
+        return `
+          <div class="lv-item" data-id="${m.id}" style="animation-delay:${(gi*8+i)*28}ms">
+            <div class="lv-thumb">${thumb}</div>
+            <div class="lv-info">
+              <div class="lv-title">${esc(m.title)}</div>
+              <div class="lv-date">${fmtJP(m.date)}</div>
+              ${m.notes ? `<div class="lv-note">${esc(m.notes)}</div>` : ''}
+            </div>
+            ${score}
+          </div>`;
+      }).join('')}
+    </div>`).join('')}</div>`;
+
+  initImgs(el);
+  el.querySelectorAll('.lv-item').forEach(c =>
+    c.addEventListener('click', () => openEdit(c.dataset.id)));
+}
+
+function renderGrid(el, movies) {
+  const sorted = [...movies].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  el.innerHTML = `<div class="gv-wrap">${sorted.map((m,i) => {
+    const p = imgUrl(m.posterPath);
+    const imgHtml = p
+      ? `<img class="gv-img" data-src="${esc(p)}" alt="">`
+      : `<div class="gv-ph">🎬</div>`;
+    const score = m.score > 0 ? `<div class="gv-score">★ ${m.score}</div>` : '';
+    return `
+      <div class="gv-card" data-id="${m.id}" style="animation-delay:${i*22}ms">
+        ${imgHtml}
+        <div class="gv-overlay">
+          <div class="gv-title">${esc(m.title)}</div>
+          ${score}
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+
+  initImgs(el);
+  el.querySelectorAll('.gv-card').forEach(c =>
+    c.addEventListener('click', () => openEdit(c.dataset.id)));
+}
+
+/* ── RANKING ─────────────────────────────────── */
+function renderRanking(el, filtered, allMovies) {
+  const years  = [...new Set(allMovies.map(m=>yearOf(m.date)).filter(y=>y!=='不明'))].sort().reverse();
+  const scope  = rankYear === 'all' ? filtered : filtered.filter(m=>yearOf(m.date)===rankYear);
+  const ranked = [...scope].filter(m=>m.score>0).sort((a,b)=>b.score-a.score);
+  const unsco  = scope.filter(m=>!m.score||m.score<=0).length;
+  const avg    = ranked.length ? (ranked.reduce((s,m)=>s+m.score,0)/ranked.length).toFixed(1) : null;
+
+  const badge = i => ['🥇','🥈','🥉'][i] ?? `#${i+1}`;
+  const rcls  = i => ['r1','r2','r3'][i] ?? 'rN';
+
+  const yearOpts = [
+    `<option value="all" ${rankYear==='all'?'selected':''}>全期間</option>`,
+    ...years.map(y=>`<option value="${y}" ${y===rankYear?'selected':''}>${y}年</option>`)
+  ].join('');
+
+  const stats = ranked.length
+    ? `${scope.length}作品 ／ スコア付き ${ranked.length}作品 ／ 平均 ${avg}`
+    : `${scope.length}作品`;
+
+  const listHTML = ranked.length === 0
+    ? `<div class="empty">
+        <div class="empty-icon">🏆</div>
+        <div class="empty-title">スコア付きの記録がありません</div>
+        <div class="empty-sub">記録時にスコアをつけると\nここにランキングが表示されます</div>
+      </div>`
+    : ranked.map((m,i) => {
+        const p = imgUrl(m.posterPath);
+        const thumb = p
+          ? `<img data-src="${esc(p)}" alt="">`
+          : `<div class="rank-poster-ph">🎬</div>`;
+        return `
+          <div class="rank-item ${rcls(i)}" data-id="${m.id}" style="animation-delay:${i*30}ms">
+            <div class="rank-num">${badge(i)}</div>
+            <div class="rank-poster">${thumb}</div>
+            <div class="rank-info">
+              <div class="rank-title">${esc(m.title)}</div>
+              <div class="rank-date">${fmtJP(m.date)}</div>
+            </div>
+            <div class="rank-score">${m.score}</div>
+          </div>`;
+      }).join('');
+
+  el.innerHTML = `
+    <div class="rank-hdr">
+      <div class="rank-label">ランキング</div>
+      <select id="yearSel">${yearOpts}</select>
+    </div>
+    <div class="rank-stats">${stats}</div>
+    ${listHTML}
+    ${unsco > 0 ? `<div style="text-align:center;margin-top:14px;font-size:.65rem;color:var(--cream-m);font-family:'DM Mono',monospace;">スコア未設定 ${unsco}作品</div>` : ''}`;
+
+  initImgs(el);
+  el.querySelectorAll('.rank-item').forEach(r =>
+    r.addEventListener('click', () => openEdit(r.dataset.id)));
+  document.getElementById('yearSel').addEventListener('change', e => {
+    rankYear = e.target.value; render();
+  });
+}
+
+/* ── SETTINGS ────────────────────────────────── */
+function renderSettings(el, movies) {
+  const apiKey = cfg.val('tmdbKey') || '';
+  const years  = [...new Set(movies.map(m=>yearOf(m.date)).filter(y=>y!=='不明'))];
+  const scored = movies.filter(m=>m.score>0);
+  const avg    = scored.length
+    ? (scored.reduce((s,m)=>s+m.score,0)/scored.length).toFixed(1) : '—';
+
+  el.innerHTML = `
+    <!-- Stats summary -->
+    <div class="set-section">
+      <div class="set-ttl">記録サマリー</div>
+      <div class="set-stats-grid">
+        ${[
+          [movies.length, '本の映画'],
+          [years.length,  '年の記録'],
+          [avg,           '平均スコア']
+        ].map(([v,l]) => `
+          <div class="set-stat">
+            <span class="set-stat-v">${v}</span>
+            <span class="set-stat-l">${l}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- TMDB API -->
+    <div class="set-section">
+      <div class="set-ttl">映画データベース (TMDB)</div>
+      <div class="set-card">
+        <div class="set-card-ttl">APIキー設定</div>
+        <div class="set-card-desc">
+          映画タイトルの検索候補・ポスター画像の表示に使います。
+          <a href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org</a>
+          で無料登録後、APIキーを取得できます。
+        </div>
+        <div class="api-row">
+          <input class="finput" type="password" id="apiKeyInput" value="${esc(apiKey)}" placeholder="APIキーを貼り付け…">
+          <button class="btn-sm gold" id="saveKeyBtn">保存</button>
+        </div>
+        <div class="api-status" id="apiStatus">
+          <div class="api-dot ${apiKey ? 'ok' : ''}"></div>
+          <span>${apiKey ? 'APIキー設定済み — 検索補完・ポスター画像が使えます' : '未設定 — タイトルは手動入力になります'}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Backup -->
+    <div class="set-section">
+      <div class="set-ttl">バックアップ / 移行</div>
+      <div class="set-card">
+        <div class="set-card-ttl">データの保存について</div>
+        <div class="set-card-desc">
+          データはこのブラウザのローカルストレージに保存されています。
+          機種変更・ブラウザリセット時は消える可能性があります。
+          定期的にエクスポートしてバックアップしておきましょう。
+        </div>
+        <button class="btn-export" id="exportBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          JSONでエクスポート（バックアップ）
+        </button>
+        <button class="btn-import" id="importBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          JSONからインポート（復元）
+        </button>
+      </div>
+    </div>`;
+
+  /* Settings events */
+  document.getElementById('saveKeyBtn').addEventListener('click', () => {
+    const k = document.getElementById('apiKeyInput').value.trim();
+    cfg.set('tmdbKey', k);
+    showToast(k ? 'APIキーを保存しました ✓' : 'APIキーを削除しました');
+    render();
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const data = { exportedAt: new Date().toISOString(), count: movies.length, movies: db.all() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), {
+      href: url, download: `eigakiroku_${today()}.json`
+    });
+    a.click(); URL.revokeObjectURL(url);
+    showToast('エクスポートしました ✓');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+  });
+}
+
+/* ══════════════════════════════════════════════
+   TMDB SEARCH
+   ══════════════════════════════════════════════ */
+function searchTMDB(q) {
+  const apiKey = cfg.val('tmdbKey');
+  const drop   = document.getElementById('tmdbDrop');
+  if (!apiKey || q.trim().length < 1) { drop.classList.remove('show'); return; }
+
+  drop.innerHTML = `<div class="tmdb-msg">検索中…</div>`;
+  drop.classList.add('show');
+
+  const url = `${TMDB_BASE}/search/movie?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(q)}&language=ja-JP&include_adult=false`;
+  fetch(url)
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(data => {
+      tmdbCache = (data.results || []).slice(0, 8);
+      if (!tmdbCache.length) {
+        drop.innerHTML = `<div class="tmdb-msg">見つかりませんでした</div>`;
+        return;
+      }
+      drop.innerHTML = tmdbCache.map((r, idx) => {
+        const year   = r.release_date ? r.release_date.slice(0,4) : '';
+        const genres = (r.genre_ids||[]).map(id=>GENRE_MAP[id]).filter(Boolean).slice(0,2).join(' · ');
+        const thumb  = r.poster_path
+          ? `<img src="${IMG_BASE}${r.poster_path}" alt="">`
+          : `<div class="tmdb-thumb-ph">🎬</div>`;
+        return `
+          <div class="tmdb-item" data-idx="${idx}">
+            <div class="tmdb-thumb">${thumb}</div>
+            <div>
+              <div class="tmdb-item-title">${esc(r.title || r.original_title)}</div>
+              <div class="tmdb-item-year">${[year, genres].filter(Boolean).join(' · ')}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+      drop.querySelectorAll('.tmdb-item').forEach(item =>
+        item.addEventListener('click', () => {
+          selectMovie(tmdbCache[parseInt(item.dataset.idx)]);
+        })
+      );
+    })
+    .catch(() => {
+      drop.innerHTML = `<div class="tmdb-msg">エラーが発生しました（APIキーを確認してください）</div>`;
+    });
+}
+
+function selectMovie(r) {
+  const year  = r.release_date ? r.release_date.slice(0,4) : '';
+  const title = r.title || r.original_title || '';
+  const orig  = r.original_title && r.original_title !== r.title ? r.original_title : '';
+
+  document.getElementById('fTmdbId').value    = r.id || '';
+  document.getElementById('fPosterPath').value = r.poster_path || '';
+  document.getElementById('fYear').value       = year;
+
+  const thumbEl = document.getElementById('selThumb');
+  thumbEl.innerHTML = r.poster_path
+    ? `<img src="${IMG_BASE}${r.poster_path}" alt="" style="width:100%;height:100%;object-fit:cover">`
+    : `<div class="sel-thumb-ph">🎬</div>`;
+
+  document.getElementById('selTitle').textContent = title;
+  document.getElementById('selMeta').textContent  = [year, orig].filter(Boolean).join(' / ');
+
+  document.getElementById('movieSel').classList.remove('hidden');
+  document.getElementById('titleWrap').classList.add('hidden');
+  document.getElementById('tmdbDrop').classList.remove('show');
+
+  // Keep title accessible for save
+  document.getElementById('fTitle').dataset.selected = title;
+}
+
+/* ══════════════════════════════════════════════
+   SHEET
+   ══════════════════════════════════════════════ */
+function openSheet()  {
+  document.getElementById('overlay').classList.add('on');
+  document.getElementById('sheet').classList.add('on');
+  document.body.style.overflow = 'hidden';
+}
+function closeSheet() {
+  document.getElementById('overlay').classList.remove('on');
+  document.getElementById('sheet').classList.remove('on');
+  document.body.style.overflow = '';
+  editId = null;
+}
+
+function resetForm() {
+  ['fTmdbId','fPosterPath','fYear'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fTitle').value = '';
+  document.getElementById('fTitle').dataset.selected = '';
+  document.getElementById('fNotes').value = '';
+  document.getElementById('fDate').value  = '';
+  document.getElementById('movieSel').classList.add('hidden');
+  document.getElementById('titleWrap').classList.remove('hidden');
+  document.getElementById('tmdbDrop').classList.remove('show');
+  setScore(0);
+}
+
+function openAdd() {
+  editId = null;
+  document.getElementById('sheetTtl').textContent = '記録を追加';
+  resetForm();
+  document.getElementById('fDate').value = today();
+  document.getElementById('delBtn').classList.add('hidden');
+  openSheet();
+  setTimeout(() => document.getElementById('fTitle').focus(), 380);
+}
+
+function openEdit(id) {
+  const m = db.all().find(x => x.id === id);
+  if (!m) return;
+  editId = id;
+  document.getElementById('sheetTtl').textContent = '記録を編集';
+  resetForm();
+  document.getElementById('fTitle').value  = m.title  || '';
+  document.getElementById('fDate').value   = m.date   || '';
+  document.getElementById('fNotes').value  = m.notes  || '';
+  document.getElementById('fTmdbId').value = m.tmdbId || '';
+  document.getElementById('fYear').value   = m.year   || '';
+  setScore(m.score || 0);
+
+  if (m.posterPath) {
+    document.getElementById('fPosterPath').value = m.posterPath;
+    document.getElementById('fTitle').dataset.selected = m.title || '';
+    const thumbEl = document.getElementById('selThumb');
+    thumbEl.innerHTML = `<img src="${IMG_BASE}${m.posterPath}" alt="" style="width:100%;height:100%;object-fit:cover">`;
+    document.getElementById('selTitle').textContent = m.title || '';
+    document.getElementById('selMeta').textContent  = m.year  || '';
+    document.getElementById('movieSel').classList.remove('hidden');
+    document.getElementById('titleWrap').classList.add('hidden');
+  }
+
+  document.getElementById('delBtn').classList.remove('hidden');
+  openSheet();
+}
+
+function setScore(v) {
+  const s = document.getElementById('fScore');
+  s.value = v;
+  s.style.setProperty('--pct', v === 0 ? '0%' : (v/10*100)+'%');
+  document.getElementById('scoreDisp').textContent = v === 0 ? '未設定' : v;
+}
+
+/* ── SAVE ────────────────────────────────────── */
+function saveRecord() {
+  // Determine title: TMDB selected or manually typed
+  const manualTitle   = document.getElementById('fTitle').value.trim();
+  const selectedTitle = document.getElementById('fTitle').dataset.selected || '';
+  const titleWrapHid  = document.getElementById('titleWrap').classList.contains('hidden');
+  const title         = titleWrapHid ? selectedTitle : manualTitle;
+
+  const date       = document.getElementById('fDate').value;
+  const score      = parseFloat(document.getElementById('fScore').value) || 0;
+  const notes      = document.getElementById('fNotes').value.trim();
+  const tmdbId     = document.getElementById('fTmdbId').value     || null;
+  const posterPath = document.getElementById('fPosterPath').value || null;
+  const year       = document.getElementById('fYear').value       || null;
+
+  if (!title) { showToast('タイトルを入力してください'); return; }
+  if (!date)  { showToast('視聴日を入力してください');   return; }
+
+  const payload = { title, date, score, notes, tmdbId, posterPath, year };
+  if (editId) db.upd(editId, payload);
+  else        db.add(payload);
+
+  closeSheet();
+  render();
+  showToast(editId ? '更新しました ✓' : '記録しました ✓');
+}
+
+/* ── VIEW TOGGLE ICONS ───────────────────────── */
+const ICON_LIST = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>`;
+const ICON_GRID = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`;
+
+function syncViewIcon() {
+  document.getElementById('viewIcon').innerHTML = listMode === 'list' ? ICON_GRID : ICON_LIST;
+}
+
+/* ── TOAST ───────────────────────────────────── */
+let toastTmr = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTmr);
+  toastTmr = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+/* ════════════════════════════════════════════════
+   EVENT LISTENERS
+   ════════════════════════════════════════════════ */
+
+/* FAB */
+document.getElementById('fab').addEventListener('click', openAdd);
+
+/* Overlay close */
+document.getElementById('overlay').addEventListener('click', closeSheet);
+
+/* Tabs */
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+  t.classList.add('on');
+  view = t.dataset.v;
+  if (view !== 'journal') {
+    document.getElementById('searchWrap').classList.remove('open');
+    document.getElementById('searchBtn').classList.remove('on');
+    query = ''; document.getElementById('searchInput').value = '';
+  }
+  render();
+}));
+
+/* Search toggle */
+document.getElementById('searchBtn').addEventListener('click', () => {
+  const w = document.getElementById('searchWrap');
+  const b = document.getElementById('searchBtn');
+  if (w.classList.contains('open')) {
+    w.classList.remove('open'); b.classList.remove('on');
+    query = ''; document.getElementById('searchInput').value = ''; render();
+  } else {
+    w.classList.add('open'); b.classList.add('on');
+    setTimeout(() => document.getElementById('searchInput').focus(), 310);
+  }
+});
+document.getElementById('searchInput').addEventListener('input', e => {
+  query = e.target.value.trim(); render();
+});
+
+/* View toggle */
+document.getElementById('viewToggle').addEventListener('click', () => {
+  listMode = listMode === 'list' ? 'grid' : 'list';
+  syncViewIcon();
+  render();
+});
+
+/* Score slider */
+document.getElementById('fScore').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  e.target.style.setProperty('--pct', v === 0 ? '0%' : (v/10*100)+'%');
+  document.getElementById('scoreDisp').textContent = v === 0 ? '未設定' : v;
+});
+
+/* Save */
+document.getElementById('saveBtn').addEventListener('click', saveRecord);
+
+/* Delete */
+document.getElementById('delBtn').addEventListener('click', () => {
+  if (!editId) return;
+  const m = db.all().find(x => x.id === editId);
+  if (m && confirm(`「${m.title}」の記録を削除しますか？`)) {
+    db.del(editId); closeSheet(); render();
+    showToast('削除しました');
+  }
+});
+
+/* TMDB title search */
+document.getElementById('fTitle').addEventListener('input', e => {
+  clearTimeout(tmdbTimer);
+  tmdbTimer = setTimeout(() => searchTMDB(e.target.value), 350);
+});
+
+/* TMDB dropdown: close on outside click */
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('titleWrap');
+  const drop = document.getElementById('tmdbDrop');
+  if (wrap && !wrap.contains(e.target)) drop.classList.remove('show');
+});
+
+/* Change selected TMDB movie */
+document.getElementById('selChange').addEventListener('click', () => {
+  document.getElementById('movieSel').classList.add('hidden');
+  document.getElementById('titleWrap').classList.remove('hidden');
+  document.getElementById('fTmdbId').value     = '';
+  document.getElementById('fPosterPath').value  = '';
+  document.getElementById('fYear').value        = '';
+  document.getElementById('fTitle').value       = '';
+  document.getElementById('fTitle').dataset.selected = '';
+  document.getElementById('fTitle').focus();
+});
+
+/* Import */
+document.getElementById('importFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data     = JSON.parse(ev.target.result);
+      const imported = data.movies || (Array.isArray(data) ? data : []);
+      if (!Array.isArray(imported)) throw new Error();
+      const existing = new Set(db.all().map(m => m.id));
+      const fresh    = imported.filter(m => !existing.has(m.id));
+      db.save([...db.all(), ...fresh]);
+      render();
+      showToast(`${fresh.length}件をインポートしました ✓`);
+    } catch { showToast('インポートに失敗しました'); }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+/* ── SERVICE WORKER ──────────────────────────── */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+/* ── INIT ────────────────────────────────────── */
+syncViewIcon();
+render();
+</script>
+</body>
+</html>
