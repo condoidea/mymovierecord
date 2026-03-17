@@ -74,7 +74,11 @@
     html { touch-action: manipulation; }
 
     /* ── LAYOUT ───────────────────────────────── */
-    #app { position:relative; z-index:1; max-width:640px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
+    #app {
+      position:relative; z-index:1; max-width:640px; margin:0 auto;
+      height:100vh; height:100dvh; height:-webkit-fill-available;
+      display:flex; flex-direction:column; overflow:hidden;
+    }
 
     /* ── HEADER ───────────────────────────────── */
     #header {
@@ -128,7 +132,7 @@
     .tab.on { color:var(--gold); border-bottom-color:var(--gold); }
 
     /* ── MAIN ─────────────────────────────────── */
-    #main { flex:1; padding:16px 20px calc(80px + var(--sb)); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    #main { flex:1; min-height:0; padding:16px 20px calc(80px + var(--sb)); overflow-y:auto; -webkit-overflow-scrolling:touch; }
     #main.no-scroll { padding:0; overflow:hidden; display:flex; flex-direction:column; }
 
     /* ── MONTH GROUPS ─────────────────────────── */
@@ -203,7 +207,7 @@
     .gv-score { font-family:'DM Mono',monospace; font-size:.62rem; color:var(--gold); margin-top:3px; }
 
     /* ── RANKING VIEW ─────────────────────────── */
-    .rank-sticky { flex-shrink:0; padding:16px 20px 0; }
+    .rank-sticky { flex-shrink:0; padding:16px 20px 0; background:var(--bg); position:relative; z-index:2; }
     .rank-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 20px calc(80px + var(--sb)); }
     .rank-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
     .rank-label { font-family:'Playfair Display',serif; font-size:1rem; color:var(--gold); }
