@@ -80,7 +80,12 @@
     #header {
       position: sticky; top: 0; z-index: 100;
       padding: calc(var(--st) + 14px) 20px 0;
-      background: linear-gradient(to bottom, var(--bg) 65%, transparent);
+      background: var(--bg);
+    }
+    /* Cover the notch/status bar area so scrolled content doesn't show through */
+    #header::before {
+      content:''; position:absolute; top:calc(-1 * var(--st)); left:0; right:0;
+      height:var(--st); background:var(--bg); z-index:1;
     }
     .hdr-row { display:flex; align-items:flex-end; justify-content:space-between; padding-bottom:2px; }
     .app-title {
@@ -124,6 +129,7 @@
 
     /* ── MAIN ─────────────────────────────────── */
     #main { flex:1; padding:16px 20px calc(80px + var(--sb)); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    #main.no-scroll { padding:0; overflow:hidden; display:flex; flex-direction:column; }
 
     /* ── MONTH GROUPS ─────────────────────────── */
     .mgroup { margin-bottom:24px; }
@@ -197,6 +203,8 @@
     .gv-score { font-family:'DM Mono',monospace; font-size:.62rem; color:var(--gold); margin-top:3px; }
 
     /* ── RANKING VIEW ─────────────────────────── */
+    .rank-sticky { flex-shrink:0; padding:16px 20px 0; }
+    .rank-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 20px calc(80px + var(--sb)); }
     .rank-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
     .rank-label { font-family:'Playfair Display',serif; font-size:1rem; color:var(--gold); }
     #yearSel {
@@ -603,6 +611,9 @@ function render() {
   fab.classList.toggle('hidden', view === 'settings');
   vt.style.visibility = view === 'journal' ? 'visible' : 'hidden';
 
+  // Ranking uses its own scroll container
+  el.classList.toggle('no-scroll', view === 'ranking');
+
   if      (view === 'journal')  renderJournal(el, fil);
   else if (view === 'ranking')  renderRanking(el, fil, movies);
   else if (view === 'settings') renderSettings(el, movies);
@@ -723,13 +734,17 @@ function renderRanking(el, filtered, allMovies) {
       }).join('');
 
   el.innerHTML = `
-    <div class="rank-hdr">
-      <div class="rank-label">ランキング</div>
-      <select id="yearSel">${yearOpts}</select>
+    <div class="rank-sticky">
+      <div class="rank-hdr">
+        <div class="rank-label">ランキング</div>
+        <select id="yearSel">${yearOpts}</select>
+      </div>
+      <div class="rank-stats">${stats}</div>
     </div>
-    <div class="rank-stats">${stats}</div>
-    ${listHTML}
-    ${unsco > 0 ? `<div style="text-align:center;margin-top:14px;font-size:.65rem;color:var(--cream-m);font-family:'DM Mono',monospace;">スコア未設定 ${unsco}作品</div>` : ''}`;
+    <div class="rank-scroll">
+      ${listHTML}
+      ${unsco > 0 ? `<div style="text-align:center;margin-top:14px;font-size:.65rem;color:var(--cream-m);font-family:'DM Mono',monospace;">スコア未設定 ${unsco}作品</div>` : ''}
+    </div>`;
 
   initImgs(el);
   el.querySelectorAll('.rank-item').forEach(r =>
